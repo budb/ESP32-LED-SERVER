@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>RGB LED SERVER</title></head>
+<style type="text/css">
+html {
+height: 100%;}
+body {
+margin: 0;
+background: #eee; /* For browsers that do not support gradients */
+background: -webkit-radial-gradient(#eee, #bbb); /* Safari 5.1 to 6.0 */
+background: -o-radial-gradient(#eee, #bbb); /* For Opera 11.6 to 12.0 */
+background: -moz-radial-gradient(#eee, #bbb); /* For Firefox 3.6 to 15 */
+background: radial-gradient(#eee, #bbb); /* Standard syntax */
+background-repeat: no-repeat;}
+h1 {
+padding: 14px;margin: 0;
+background-color: #111;
+color: #eee;}
+ul {
+list-style-type: none;
+margin: 0;padding: 0;
+overflow: hidden;
+background-color: #333;
+position: fixed;
+bottom: 0;
+width: 100%;}
+li {float: left;}
+li a {
+display: block;
+color: white;
+text-align: center;
+padding: 14px 16px;
+text-decoration: none;}
+li a:hover:not(.active) {
+background-color: #111;}
+.active {
+background-color: #666;}
+.button {
+    background: #000;
+    border: none;
+    color: white;
+    padding: 15px 32px; margin: 20px;
+    min-width: 140px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);
+}
+.off {
+    background: #fff;
+    color: #000;
+}
+.center {
+	margin-top: 20%;
+	margin-bottom: auto;
+    text-align: center;
+}
+</style>
+<body>
+	<h1>RGB LED SERVER</h1>
+	<div class="center" >
+	<form action='/mode' method='POST'>
+	<button class="button on" type='submit' name='mode' value='off'>OFF</button>
+	<button class="button off" type='submit' name='mode' value='on'>ON</button>
+	<!--<input type='submit' name='mode' value='off'/>-->
+	</form>
+	</div>
+	<ul>
+  		<li><a href="#light">LIGHT</a></li>
+  		<li><a href="#settings">SETTINGS</a></li>
+  		<li><a href="#about">ABOUT</a></li>
+  		<li style="float:right"><a class="active" href="#exit">EXIT</a></li>
+	</ul>
+</body>
+</html>
