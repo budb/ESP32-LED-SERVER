@@ -48,7 +48,7 @@ background-color: #666;}
     font-size: 16px;
     box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);
 }
-.off {
+.on {
     background: #fff;
     color: #000;
 }
@@ -61,9 +61,9 @@ background-color: #666;}
 <body>
 	<h1>RGB LED SERVER</h1>
 	<div class="center" >
-	<form action='/mode' method='POST'>
-	<button class="button on" type='submit' name='mode' value='off'>OFF</button>
-	<button class="button off" type='submit' name='mode' value='on'>ON</button>
+	<form action='/' method='POST'>
+	<button class="button off" type='submit' name='mode' value='off'>OFF</button>
+	<button class="button on" type='submit' name='mode' value='on'>ON</button>
 	<!--<input type='submit' name='mode' value='off'/>-->
 	</form>
 	</div>

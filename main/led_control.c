@@ -67,13 +67,7 @@ static const const uint8_t lights[360]={
   0,   0,   0,   0,   0,   0,   0,   0, 
   0,   0,   0,   0,   0,   0,   0,   0};
 
-void start_rainbow(void *pvParameters)
-{
-    int rgb_red=0;
-    int rgb_green=120;
-    int rgb_blue=240;
-
-    struct led_strip_t led_strip = {
+static struct led_strip_t led_strip = {
         .rgb_led_type = RGB_LED_TYPE_WS2812,
         .rmt_channel = RMT_CHANNEL_1,
         .rmt_interrupt_num = LED_STRIP_RMT_INTR_NUM,
@@ -82,51 +76,76 @@ void start_rainbow(void *pvParameters)
         .led_strip_buf_2 = led_strip_buf_2,
         .led_strip_length = LED_STRIP_LENGTH
     };
-    led_strip.access_semaphore = xSemaphoreCreateBinary();
 
-    bool led_init_ok = led_strip_init(&led_strip);
-    assert(led_init_ok);
-
-    struct led_color_t led_color = {
+static struct led_color_t led_color = {
         .red = 0,
         .green = 0,
         .blue = 0,
     };
 
-    while (xSemaphoreTake(led_mutex, ( TickType_t ) 10 ) == pdTRUE ) {
+static int rgb_red=0;
+static int rgb_green=120;
+static int rgb_blue=240;
 
-      xSemaphoreGive(led_mutex);
-      ESP_LOGI(TAG, "RUNNING led thread");
+bool running = true;
 
-        for (uint32_t index = 0; index < LED_STRIP_LENGTH; index++) {
-            led_strip_set_pixel_color(&led_strip, index, &led_color);
-        }
-        led_strip_show(&led_strip);
+void check_notify(TickType_t t)
+{
+  uint32_t ulNotifiedValue;
 
-        led_color.red   = lights[rgb_red];
-        led_color.green = lights[rgb_green];
-        led_color.blue  = lights[rgb_blue];
+  xTaskNotifyWait( 0x00,           // Don't clear any notification bits on entry. 
+                   ULONG_MAX,        // Reset the notification value to 0 on exit. 
+                   &ulNotifiedValue, // Notified value pass out in ulNotifiedValue. 
+                   t );               // Block indefinitely. 
 
-        rgb_red += 1;
-        rgb_green += 1;
-        rgb_blue += 1;
-
-        if (rgb_red >= 360) rgb_red=0;
-        if (rgb_green >= 360) rgb_green=0;
-        if (rgb_blue >= 360) rgb_blue=0;
-    
-        vTaskDelay(60 / portTICK_PERIOD_MS);
-    }
-
-    /*
-    exit and cleanup
-    */
-    ESP_LOGI(TAG, "STOPPING led thread");
-    //while (xSemaphoreTake(led_strip.access_semaphore, ( TickType_t ) 10 ) != pdTRUE ) {
-      //ESP_LOGI(TAG, "STOPPING led thread");
-    //}
-    //vSemaphoreDelete(led_strip.access_semaphore);
-    led_strip_clear(&led_strip);
-    vTaskDelete(NULL);
+  if( ( ulNotifiedValue & 0x01 ) != 0 ){running = true;}
+  else if( ( ulNotifiedValue & 0x02 ) != 0 ){running = false;}
 }
+
+void start_rainbow(void *pvParameters)
+{
+  led_strip.access_semaphore = xSemaphoreCreateBinary();
+  bool led_init_ok = led_strip_init(&led_strip);
+  assert(led_init_ok);
+  
+  while(true){
+    if(running){
+      for (uint32_t index = 0; index < LED_STRIP_LENGTH; index++) {
+        led_strip_set_pixel_color(&led_strip, index, &led_color);
+      }
+      led_strip_show(&led_strip);
+
+      led_color.red   = lights[rgb_red];
+      led_color.green = lights[rgb_green];
+      led_color.blue  = lights[rgb_blue];
+
+      rgb_red += 1;
+      rgb_green += 1;
+      rgb_blue += 1;
+
+      //reset to 0 after 360 degr
+      if (rgb_red >= 360) rgb_red=0;
+      if (rgb_green >= 360) rgb_green=0;
+      if (rgb_blue >= 360) rgb_blue=0;
+    
+      vTaskDelay(60 / portTICK_PERIOD_MS);
+      check_notify(1);
+    }
+    else{
+      led_color.red   = 0;
+      led_color.green = 0;
+      led_color.blue  = 0;
+      for (uint32_t index = 0; index < LED_STRIP_LENGTH; index++) {
+        led_strip_set_pixel_color(&led_strip, index, &led_color);
+      }
+      led_strip_show(&led_strip);
+
+      vTaskDelay(60 / portTICK_PERIOD_MS);
+      assert(led_strip_clear(&led_strip));
+      check_notify(portMAX_DELAY);
+    }
+  }
+}
+
+
 

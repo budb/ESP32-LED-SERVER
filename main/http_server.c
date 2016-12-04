@@ -38,15 +38,13 @@ TaskHandle_t led_task_handle = NULL;
 
 void http_server_netconn_serve(struct netconn *conn){
 	struct netbuf *inbuf;
-  	char *buf;
-  	u16_t buflen;
-  	err_t err;
+  char *buf;
+  u16_t buflen;
+  err_t err;
 
-  	char *reqString = NULL;
-
+  char *reqString = NULL;
 
 	const unsigned int index_html_bytes = index_html_end - index_html_start;  
-
 
   	// Read the data from the port, blocking if nothing yet there. 
   	// We assume the request (the part we care about) is in one netbuf 
@@ -63,44 +61,47 @@ void http_server_netconn_serve(struct netconn *conn){
     	strncpy( reqString, buf, buflen );
     	ESP_LOGI(TAG, "request %s", reqString);
 
-    if (strncmp( reqString, "GET / HTTP/1.1", strlen("GET / HTTP/1.1")) == 0 )
-    {
-     	ESP_LOGI(TAG, "GET ");
+      /**************
+        GET
+      ***************/
+      if (strncmp( reqString, "GET / HTTP/1.1", strlen("GET / HTTP/1.1")) == 0 )
+      {
+     	  ESP_LOGI(TAG, "GET ");
       	netconn_write(conn, header, sizeof(header)-1, NETCONN_NOCOPY);
       	netconn_write(conn, index_html_start, index_html_bytes, NETCONN_NOCOPY);
-    }
-    if (strncmp( reqString, "GET /favicon.ico", strlen("GET /favicon.ico")) == 0 )
-    {
+      }
+      if (strncmp( reqString, "GET /favicon.ico", strlen("GET /favicon.ico")) == 0 )
+      {
       	ESP_LOGI(TAG, "GET /favicon.ico");
       	netconn_write(conn, error, sizeof(error)-1, NETCONN_NOCOPY);
-    }
-    if (strncmp( reqString, "POST /mode", strlen("POST /mode")) == 0 )
-    {
-      	ESP_LOGI(TAG, "POST /mode");
+      }
+      /**************
+        POST
+      ***************/
+      if (strncmp( reqString, "POST /", strlen("POST /")) == 0 )
+      {
       	netconn_write(conn, header, sizeof(header)-1, NETCONN_NOCOPY);
-      	if(led_task_handle == NULL){
 
-        //task control mutex
-        led_mutex = xSemaphoreCreateMutex();
+        char key[]="mode"; 
+        char *value =strstr(reqString, key);
+        ESP_LOGI(TAG, "POST / %s", value);
 
-        ESP_LOGI(TAG, "start led task");
-        xTaskCreate(&start_rainbow, "start_rainbow", 2048, NULL, 5, &led_task_handle);
-      	}
-      	else if(led_task_handle != NULL){
-        ESP_LOGI(TAG, "delete task");
-
-        if( xSemaphoreTake(led_mutex, ( TickType_t ) 20 ) == pdTRUE )
-        {
-            ESP_LOGI(TAG, "stop task");
+        if(strncmp(value, "mode=on", strlen("mode=on"))== 0 ) {
+	      ESP_LOGI(TAG, "POST mode=on");
+          if(led_task_handle==NULL){
+            ESP_LOGI(TAG, "start led task");
+            xTaskCreate(&start_rainbow, "start_rainbow", 2048, NULL, 5, &led_task_handle);
+          }
+          xTaskNotify( led_task_handle, 0x01, eSetValueWithOverwrite );
         }
-        xSemaphoreGive(led_mutex);
-        led_task_handle = NULL;
+        else if(strncmp(value, "mode=off", strlen("mode=off"))== 0 ) {
+          xTaskNotify( led_task_handle, 0x02, eSetValueWithOverwrite );
+          ESP_LOGI(TAG, "POST mode=off");
+        }
+        
+        netconn_write(conn, index_html_start, index_html_bytes, NETCONN_NOCOPY);
       }
     }
-    else{
-      ESP_LOGI(TAG, "wrong request");
-    }
-  }
   else{
       ESP_LOGI(TAG, "error");
   }
