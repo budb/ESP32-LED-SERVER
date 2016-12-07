@@ -40,38 +40,112 @@ background-color: #666;}
     background: #000;
     border: none;
     color: white;
-    padding: 15px 32px; margin: 20px;
-    min-width: 140px;
+    padding: 15px 32px; margin: 10px;
+    min-width: 180px;
+    height: 60px;
     text-align: center;
     text-decoration: none;
     display: inline-block;
-    font-size: 16px;
+    vertical-align: baseline;
+    font-size: 18px;
     box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);
 }
 .on {
     background: #fff;
     color: #000;
 }
-.center {
-	margin-top: 20%;
+.content {
+	margin-top: 16%;
 	margin-bottom: auto;
-    text-align: center;
+  text-align: center;
+  display: none;
+}
+.colorpicker {
+  background: #000;
+  border: none;
+  color: white;
+  width: 180px;
+  height: 60px;
+  padding: 0px; margin: 10px; 
+  font-size: 18px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  vertical-align: middle;
+  box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);
+}
+/* Style the tab content */
+.tabcontent {
+    
 }
 </style>
 <body>
 	<h1>RGB LED SERVER</h1>
-	<div class="center" >
-	<form action='/' method='POST'>
-	<button class="button off" type='submit' name='mode' value='off'>OFF</button>
-	<button class="button on" type='submit' name='mode' value='on'>ON</button>
-	<!--<input type='submit' name='mode' value='off'/>-->
+	<form action='/' method='POST' id="form_control">
+  <div id="light" class="content" >
+    <div>
+  	  <button form="form_control" class="button off" type='submit' name='power' value='off'>OFF</button>
+  	  <button form="form_control" class="button on" type='submit' name='power' value='on'>ON</button>
+    </div>
+    <div>
+  	  <input form="form_control" class="colorpicker" onchange="clickColor(0, -1, -1, 5)" value="#ff0000" name="color" type="color">
+      <input type="hidden" id="cmode_h" name="mode" value='rainbow'></input>
+      <button id="cmode" type="button" class="button mode" onclick="switchModes(document.getElementById('cmode').value)" name='mode' value='rainbow'>RAINBOW</button>
+    </div>
+  </div>
+  <div id="settings" class="content">
+    <p>settings</p>
+  </div>
+  <div id="about" class="content">
+    <p>about</p>
+  </div>
 	</form>
-	</div>
-	<ul>
-  		<li><a href="#light">LIGHT</a></li>
-  		<li><a href="#settings">SETTINGS</a></li>
-  		<li><a href="#about">ABOUT</a></li>
-  		<li style="float:right"><a class="active" href="#exit">EXIT</a></li>
+	<ul class="tab">
+  		<li><a href="javascript:void(0)" class="tablinks" onclick="switchMenu(event, 'light')" id="default">LIGHT</a></li>
+  		<li><a href="javascript:void(0)" class="tablinks" onclick="switchMenu(event, 'settings')">SETTINGS</a></li>
+  		<li><a href="javascript:void(0)" class="tablinks" onclick="switchMenu(event, 'about')">ABOUT</a></li>
+  		<!--<li style="float:right"><a class="active" onclick="self.close()">EXIT</a></li>-->
 	</ul>
 </body>
+<script>
+document.getElementById("default").click();
+function switchModes(v)
+{
+  console.log("value " + v);
+  switch (v){
+    case "rainbow":
+      document.getElementById("cmode").innerHTML = "CONTINUOUS";
+      document.getElementById("cmode").value = "continuous";
+      document.getElementById("cmode_h").value = "continuous";
+      break;
+    case "continuous":
+      document.getElementById("cmode").innerHTML = "RAINBOW";
+      document.getElementById("cmode").value = "rainbow";
+      document.getElementById("cmode_h").value = "rainbow";
+      break;
+  }
+}
+function switchMenu(evt, t)
+{
+  console.log("menu_switch " + t);
+  // Declare all variables
+  var i, tabcontent, tablinks;
+
+  // Get all elements with class="tabcontent" and hide them
+  tabcontent = document.getElementsByClassName("content");
+  for (i = 0; i < tabcontent.length; i++) {
+    tabcontent[i].style.display = "none";
+  }
+
+  // Get all elements with class="tablinks" and remove the class "active"
+  tablinks = document.getElementsByClassName("tablinks");
+  for (i = 0; i < tablinks.length; i++) {
+    tablinks[i].className = tablinks[i].className.replace(" active", "");
+  }
+
+  // Show the current tab, and add an "active" class to the link that opened the tab
+  document.getElementById(t).style.display = "block";
+  evt.currentTarget.className += " active";
+}
+</script>
 </html>

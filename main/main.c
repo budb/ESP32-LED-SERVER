@@ -29,8 +29,10 @@
 
 static const char *TAG = "main";
 
-#define WIFI_SSID "-"
-#define WIFI_PASS "-"
+#define WIFI_SSID "KDG-0CD21"
+#define WIFI_PASS "SwmrnmR1Cxya"
+//#define LWIP_NETIF_HOSTNAME "rgbled"
+#define DHCP_OPTION_HOSTNAME "rgbled"
 
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 static EventGroupHandle_t wifi_event_group;

@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdlib.h>     /* atoi */
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -29,89 +30,147 @@
 
 static const char *TAG = "http_server";
 
-static const char header[] = "HTTP/1.1 200 OK\r\nContent-type: text/html\r\n\r\n";
+static const char header[] = "HTTP/1.1 200 OK\r\n\
+                              Content-type: text/html; charset=UTF-8\r\n\
+                              Content-Encoding: UTF-8\r\n\
+                              Connection: close\r\n\r\n";
 
 static char error[] = "HTTP/1.1 501 Not Implemented\r\n\r\n";
 
 TaskHandle_t led_task_handle = NULL;
 
+enum reqtype {GET, POST};
 
+struct http_request {
+    enum reqtype type;
+    char document[16];
+    u16_t request_length;
+    u16_t content_length;
+    char content[128];
+};
+
+/*
+  parses and handles the http request
+*/
+struct http_request *parse_request(struct netconn *conn, struct netbuf * buf){
+  struct http_request *request;
+  request=(struct http_request*)malloc(sizeof(struct http_request));
+
+  //set request size
+  request->request_length = netbuf_len ( buf ); 
+
+  //raw request data
+  char data[request->request_length+1];
+  netbuf_copy (buf, data, request->request_length);
+
+  //check type
+  if (strncmp(data, "GET", strlen("GET")) == 0){
+    request->type=GET;
+    ESP_LOGI(TAG, "GET");
+
+    //set document path
+    char * delimiter=strchr(data+4,' ');
+    memcpy(request->document, data+4, delimiter-(data+4));
+    request->document[delimiter-(data+4)]='\0';
+    ESP_LOGI(TAG, "Document: %s|", request->document);
+
+  }
+  else if (strncmp(data, "POST", strlen("POST")) == 0){
+    request->type=POST;
+    ESP_LOGI(TAG, "POST");
+
+    //set document path
+    char * delimiter=strchr(data+5,' ');
+    memcpy(request->document, data+5, delimiter-(data+5));
+    request->document[delimiter-(data+5)]='\0';
+    ESP_LOGI(TAG, "Document: %s|", request->document);
+    
+    //check content length
+    char key[]="Content-Length: "; 
+    char *clen_Str =strstr(data, key);
+    if(clen_Str!=NULL){
+      request->content_length = atoi (clen_Str+16);
+      ESP_LOGI(TAG, "Content-Length: %d|", request->content_length);
+    }
+
+    //set content
+    strcpy(request->content, data+(request->request_length-request->content_length));
+    request->content[request->content_length]='\0';
+    ESP_LOGI(TAG, "Content: %s|", request->content);
+
+  }
+
+  ESP_LOGI(TAG, "Receive:\r\n%s|", data);
+
+  //cleanup and return
+  netbuf_delete (buf);
+
+  return request;
+}
+
+
+/*
+
+*/
 void http_server_netconn_serve(struct netconn *conn){
-	struct netbuf *inbuf;
-  char *buf;
-  u16_t buflen;
-  err_t err;
-
-  char *reqString = NULL;
 
 	const unsigned int index_html_bytes = index_html_end - index_html_start;  
 
-  	// Read the data from the port, blocking if nothing yet there. 
-  	// We assume the request (the part we care about) is in one netbuf 
-  	err = netconn_recv(conn, &inbuf);
-  
+  struct netbuf  * buf;
+  struct netbuf  * nextBuf;
+  struct http_request request;
 
-  	if (err == ERR_OK) 
-  	{
-    	netbuf_data(inbuf, (void**)&buf, &buflen);
-    	buflen = ( buflen > 768 ) ? 768 : buflen;
+  netconn_set_recvtimeout(conn, 2);
 
-    	reqString = malloc(sizeof(char)*buflen);
-
-    	strncpy( reqString, buf, buflen );
-    	ESP_LOGI(TAG, "request %s", reqString);
-
-      /**************
-        GET
-      ***************/
-      if (strncmp( reqString, "GET / HTTP/1.1", strlen("GET / HTTP/1.1")) == 0 )
-      {
-     	  ESP_LOGI(TAG, "GET ");
-      	netconn_write(conn, header, sizeof(header)-1, NETCONN_NOCOPY);
-      	netconn_write(conn, index_html_start, index_html_bytes, NETCONN_NOCOPY);
-      }
-      if (strncmp( reqString, "GET /favicon.ico", strlen("GET /favicon.ico")) == 0 )
-      {
-      	ESP_LOGI(TAG, "GET /favicon.ico");
-      	netconn_write(conn, error, sizeof(error)-1, NETCONN_NOCOPY);
-      }
-      /**************
-        POST
-      ***************/
-      if (strncmp( reqString, "POST /", strlen("POST /")) == 0 )
-      {
-      	netconn_write(conn, header, sizeof(header)-1, NETCONN_NOCOPY);
-
-        char key[]="mode"; 
-        char *value =strstr(reqString, key);
-        ESP_LOGI(TAG, "POST / %s", value);
-
-        if(strncmp(value, "mode=on", strlen("mode=on"))== 0 ) {
-	      ESP_LOGI(TAG, "POST mode=on");
-          if(led_task_handle==NULL){
-            ESP_LOGI(TAG, "start led task");
-            xTaskCreate(&start_rainbow, "start_rainbow", 2048, NULL, 5, &led_task_handle);
-          }
-          xTaskNotify( led_task_handle, 0x01, eSetValueWithOverwrite );
-        }
-        else if(strncmp(value, "mode=off", strlen("mode=off"))== 0 ) {
-          xTaskNotify( led_task_handle, 0x02, eSetValueWithOverwrite );
-          ESP_LOGI(TAG, "POST mode=off");
-        }
-        
-        netconn_write(conn, index_html_start, index_html_bytes, NETCONN_NOCOPY);
-      }
+  if ( netconn_recv ( conn, &buf ) == ERR_OK )
+  {    
+    //appending request to ensure post req are detecte4d correctly
+    if ( netconn_recv ( conn, &nextBuf) == ERR_OK ){
+      ESP_LOGI(TAG, "append next buffer\r\n");
+      netbuf_chain (buf, nextBuf);
     }
-  else{
-      ESP_LOGI(TAG, "error");
+
+    //parse the request
+    request = *parse_request(conn, buf);
   }
 
-  // Close the connection (server closes in HTTP) 
+  if(request.type==GET){
+    ESP_LOGI(TAG, "GET RETURN");
+    if (strncmp(request.document, "/favicon.ico", strlen("/favicon.ico")) == 0){
+      goto return_error;
+    }
+    else if (strncmp(request.document, "/", strlen("/")) == 0){
+      goto return_page;
+    }
+    goto return_error;
+  }
+  else if (request.type==POST){
+    ESP_LOGI(TAG, "POST RETURN");
+    if (strncmp(request.document, "/", strlen("/")) == 0){
+      ESP_LOGI(TAG, "Directory /");
+      if (strncmp(request.content, "power=on", strlen("power=on")) == 0){
+        ESP_LOGI(TAG, "Led on");
+        if(led_task_handle==NULL){
+          ESP_LOGI(TAG, "start led task");
+          xTaskCreate(&start_rainbow, "start_rainbow", 2048, NULL, 5, &led_task_handle);
+        }
+        xTaskNotify( led_task_handle, 0x01, eSetValueWithOverwrite );
+      }
+      else if (strncmp(request.content, "power=off", strlen("power=off")) == 0){
+        ESP_LOGI(TAG, "Led off");
+        xTaskNotify( led_task_handle, 0x02, eSetValueWithOverwrite );
+      }
+      goto return_page;
+    }
+  }
+
+return_page:
+  netconn_write(conn, header, sizeof(header)-1, NETCONN_NOCOPY);
+  netconn_write(conn, index_html_start, index_html_bytes-1, NETCONN_NOCOPY);
   netconn_close(conn);
-  
-  // Delete the buffer (netconn_recv gives us ownership,
-  // so we have to make sure to deallocate the buffer) 
-  netbuf_delete(inbuf);
+return_error:
+  netconn_write(conn, error, sizeof(error)-1, NETCONN_NOCOPY);
+  netconn_close(conn);
 }
 
 void http_server_task(void *pvParameters){
